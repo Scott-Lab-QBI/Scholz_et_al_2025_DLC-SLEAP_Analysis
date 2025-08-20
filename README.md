@@ -17,6 +17,7 @@ Leandro A. Scholz, Tessa Mancienne, Sarah J. Stednitz, Ethan K. Scott, Conrad C.
 | **pxl_resolution** | This allows conversion of pixel to mm. Especially useful for speed/accerlation plots.|
 | **tolerance** | Allows user to remove noisy signals.|
 
+\
 5. Parameters for bout detection are video and tracking quality dependent. <ins> We advise users to use this with caution! </ins> Bout detection is determined by peak-detection and these parameters determine the sensitivity. We advise users to check how well bout detection works on their own dataset first by visually checking against speed and tail angle plots.
 6. The core functions are: get_body_center, get_point_metrics, get_vector_metrics, get_bout_metrics. Each functions has individual help comments if users need additional explainations.
 7. Looking at demo_script.m, you will find basic plots for a 6s recording of a 6dpf fish.
