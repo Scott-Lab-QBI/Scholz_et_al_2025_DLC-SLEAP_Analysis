@@ -1,12 +1,58 @@
-% smooth_window = 5;              % Size of smoothing window 
-% min_peak_seperation = 0.1667;   % Minimium peak seperation in seconds
-% min_peak_prominence = 0.01;     % Minimium peak prominence (au)
-% bout_window_start = 60;         % Size of window to look back to determine start of bout
-% bout_window_end = 100;          % Size of window to look forward to determine end of bout (distance)
-% num_repeats = 7;                % Number of frames of non-movement to determine fish is no longer moving
-% std_limit = 4;                  % Factor of standard deviation to define tail velocity noise
-
 function bout_metric = get_bout_metrics(point_metrics,vector_metrics,frame_rate,smooth_window,min_peak_seperation,min_peak_prominence,bout_window_start,bout_window_end,num_repeats,std_limit)
+%GET_BOUT_METRICS Identifies and analyzes individual movement bouts.
+%   BOUT_METRIC = GET_BOUT_METRICS(POINT_METRICS, VECTOR_METRICS, FRAME_RATE, ...)
+%   detects and characterizes individual "bouts" of movement (e.g., swimming or
+%   locomotion) based on smoothed distance and kinematic data. It uses a peak-finding
+%   algorithm to locate the peak of each bout and then defines the start and end of the
+%   bout based on periods of low or no movement.
+%
+%   Inputs:
+%       - point_metrics:        A structure containing point-based kinematic data,
+%                               including `.distance_mm`, `.velocity`, and `.acceleration`.
+%       - vector_metrics:       A structure containing vector-based metrics, including
+%                               `.mean_tail_vel`, `.mean_tail_angle`, and `.delta_heading`.
+%       - frame_rate:           The video frame rate in Hz.
+%       - smooth_window:        The size of the smoothing window (odd integer) for
+%                               `quick_smooth`. Defaults to 5.
+%       - min_peak_seperation:  Minimum time in seconds between movement peaks.
+%                               Defaults to 0.1667.
+%       - min_peak_prominence:  Minimum prominence of a peak (in arbitrary units) to be
+%                               considered a valid bout. Defaults to 0.01.
+%       - bout_window_start:    Number of frames to look back from a peak to find the
+%                               start of a bout. Defaults to 60.
+%       - bout_window_end:      Number of frames to look forward from a peak to find the
+%                               end of a bout. Defaults to 100.
+%       - num_repeats:          Number of consecutive frames of low/zero movement
+%                               required to define the start or end of a bout.
+%                               Defaults to 7.
+%       - std_limit:            A factor of the standard deviation used to define the
+%                               threshold for tail velocity noise. Defaults to 4.
+%
+%   Output:
+%       - bout_metric: A structure containing various metrics for each detected bout:
+%           - start_locs:           Frame index of the bout's start.
+%           - end_locs:             Frame index of the bout's end (based on distance).
+%           - tail_end_locs:        Frame index of the bout's end (based on tail movement).
+%           - total_distance:       Total distance traveled during the bout.
+%           - mean_distance:        Average distance traveled per frame during the bout.
+%           - duration_distance:    Duration of the bout in seconds (based on distance).
+%           - duration_tail:        Duration of the bout in seconds (based on tail movement).
+%           - avg_speed:            Average speed during the bout.
+%           - max_speed:            Maximum speed during the bout.
+%           - max_acceleration:     Maximum acceleration during the bout.
+%           - tail_vel:             Average absolute tail velocity during the bout.
+%           - tail_ang:             Average tail angle during the bout.
+%           - raw_tail_vel:         A cell array of the raw tail velocity trace for each bout.
+%           - raw_tail_ang:         A cell array of the raw tail angle trace for each bout.
+%           - delta_heading:        A cell array of the raw change in heading for each bout.
+%
+%   Example:
+%       % Assume `point_metrics` and `vector_metrics` structures are populated
+%       % and `frame_rate` is 300.
+%       % The function will use the default parameters for bout detection.
+%       bout_data = get_bout_metrics(point_metrics, vector_metrics, 300, [], [], [], [], [], [], []);
+%
+%   See also QUICK_SMOOTH, FIND_REPEATS.
 
 if isempty(smooth_window)
     smooth_window = 5;

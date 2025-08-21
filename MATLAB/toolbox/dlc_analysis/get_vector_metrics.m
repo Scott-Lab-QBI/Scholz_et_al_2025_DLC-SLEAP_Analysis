@@ -35,6 +35,7 @@ function vector_metrics = get_vector_metrics(data,body_parts,params,heading_part
 %           - tail_vectors_norm: The normalized vectors for each tail segment.
 %
 %   Example:
+%       % Assume `data`, `body_parts`, and `params` are defined.
 %       thr = 0.9;
 %       num_tail_seg = 9;
 %       frame_rate = 300;
@@ -48,9 +49,9 @@ function vector_metrics = get_vector_metrics(data,body_parts,params,heading_part
 %
 %   See also GET_BODY_CENTER, CAL_TAIL_ANGLE, CAL_DIFF_HEADING_DIR.
 
-% Get points for calculation 
-[origin_center, ~] = get_body_center(data,thr,body_parts,params,heading_parts.origin); 
-[point_center, ~] = get_body_center(data,thr,body_parts,params,heading_parts.point); 
+% Get points for calculation
+[origin_center, ~] = get_body_center(data,thr,body_parts,params,heading_parts.origin);
+[point_center, ~] = get_body_center(data,thr,body_parts,params,heading_parts.point);
 coord_diff = point_center'-origin_center';
 coord_diff_norm = [coord_diff(:,1)./sqrt(coord_diff(:,1).^2+coord_diff(:,2).^2) coord_diff(:,2)./sqrt(coord_diff(:,1).^2+coord_diff(:,2).^2)];
 ref = [1,0];
@@ -64,6 +65,7 @@ heading = rad2deg(atan2(determinate,dot_product)+pi);
 delta_heading = arrayfun(@(x,y) cal_diff_heading_dir(x,y), heading(1:end-1), heading(2:end));
 abs_delta_heading = min((360-abs(heading(1:end-1)-heading(2:end))),abs(heading(1:end-1)-heading(2:end)));
 
+% Calculate tail metrics
 [tail_seg_angles, mean_tail_angle, tail_vectors_norm] = cal_tail_angle(data,body_parts,params,thr,coord_diff_norm,num_tail_seg);
 
 mean_tail_vel = [0; diff(mean_tail_angle)/(1/frame_rate)];
@@ -78,5 +80,4 @@ vector_metrics.mean_tail_vel = mean_tail_vel;
 vector_metrics.mean_tail_acc = mean_tail_acc;
 vector_metrics.tail_seg_angles = tail_seg_angles;
 vector_metrics.tail_vectors_norm = tail_vectors_norm;
-
-
+end
