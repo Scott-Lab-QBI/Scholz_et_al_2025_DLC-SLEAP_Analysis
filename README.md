@@ -1,4 +1,4 @@
-# Post-DLC tracking analysis (MATLAB and Python)
+# Post tracking analysis (MATLAB and Python)
 ## Automated behavioral tracking of zebrafish larvae with DeepLabCut and SLEAP: pre-trained networks and datasets of annotated poses 
 Leandro A. Scholz, Tessa Mancienne, Sarah J. Stednitz, Ethan K. Scott, Conrad C.Y. Lee\
 bioRxiv DOI: [10.1101/2025.06.04.657938](https://doi.org/10.1101/2025.06.04.657938)\
