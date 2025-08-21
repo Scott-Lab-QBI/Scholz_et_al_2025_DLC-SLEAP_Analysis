@@ -14,7 +14,7 @@ close all
 clc
 
 %% Locate the path where you had downloaded the functions
-addpath(genpath(uigetdir('C:/', 'Select Function Path Directory')));
+addpath(genpath(uigetdir('C:/toolbox/dlc_analysis/')));
 
 %% Select where your dlc output is located
 dataPath = uigetdir;
