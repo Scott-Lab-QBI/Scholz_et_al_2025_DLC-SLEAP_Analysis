@@ -206,7 +206,8 @@ def get_point_metrics(dataframe : pd.DataFrame,
         v_y = compute_derivative(coords_smooth[mask, 1], x=time_array[mask,1])
         velocities_smooth[mask] = np.sqrt(v_x**2 + v_y**2)
         velocities_smooth = velocities_smooth * RESOLUTION
-        acceleration_smooth[mask] = compute_derivative(velocities_smooth[mask], x=time_array[mask,1])
+        acceleration_smooth[mask] = compute_derivative(velocities_smooth[mask],
+                                                       x=time_array[mask,1])
 
         coords_norm_smooth[mask, :] = (coords_smooth[mask, :] - (FRAME_SIZE/2))/ (FRAME_SIZE/2)
         diff_to_center_smooth = coords_smooth[mask, :] - np.array([(FRAME_SIZE/2), (FRAME_SIZE/2)])
@@ -569,6 +570,9 @@ def get_all_metrics(dataframe : pd.DataFrame,
                                            smooth=SMOOTH)
 
     all_metrics_df = pd.concat([point_metrics_df, vector_metrics_df], axis=1)
+
+    # Sort the column index to prevent PerformanceWarning and improve lookup speed
+    all_metrics_df.sort_index(axis=1, inplace=True)
 
     return all_metrics_df
 
