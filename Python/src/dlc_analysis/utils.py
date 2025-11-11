@@ -179,25 +179,13 @@ def compute_base_and_heading(dataframe : pd.DataFrame,
         pd.DataFrame : base dataframe with all vector-based metrics columns 
             (example with only 2 tails segments for brevity)
 
-        [(          'Frame',           'Frame'),
-         (           'Time',            'Time'),
-         (         'origin',               'x'),
+        [(         'origin',               'x'),
          (         'origin',               'y'),
          (          'point',               'x'),
          (          'point',               'y'),
          ( 'heading_vector',               'x'),
          ( 'heading_vector',               'y'),
-         ('heading_degrees', 'heading_degrees'),
-         (    'turn_angles',     'turn_angles'),
-         (  'tail_vector_1',               'x'),
-         (  'tail_vector_1',               'y'),
-         (  'tail_vector_2',               'x'),
-         (  'tail_vector_2',               'y'),
-         (   'tail_angle_1',           'angle'),
-         (   'tail_angle_2',           'angle'),
-         (            'mtc',             'mtc'),
-         (   'mtc_velocity',    'mtc_velocity'),
-         (      'mtc_accel',       'mtc_accel')]
+         ('heading_degrees', 'heading_degrees')]
     """
 
     if 'smooth' in kwargs:
@@ -235,19 +223,14 @@ def compute_base_and_heading(dataframe : pd.DataFrame,
     if SMOOTH is not None:
         heading = savgol_filter(heading, SMOOTH, polyorder=3, axis=0)
 
-    # create dataframe to store all vector based metrics and auxiliary data
-    results_structure = [['Frame',
-                          'Time',
-                          'origin',
+    results_structure = [['origin',
                           'origin',
                           'point',
                           'point',
                           'heading_vector', 
                           'heading_vector',
                           'heading_degrees'],
-                        ['Frame',
-                         'Time',
-                         'x',
+                        ['x',
                          'y',
                          'x',
                          'y',
@@ -259,17 +242,17 @@ def compute_base_and_heading(dataframe : pd.DataFrame,
     results_structure = pd.MultiIndex.from_tuples(tuples)
     df = pd.DataFrame(columns=results_structure)
 
-    df[df.columns[0]] = time_array[:,0]
-    df[df.columns[1]] = time_array[:,1]
-    df[df.columns[2:4]] = origin_matrix
-    df[df.columns[4:6]] = point_matrix
-    df[df.columns[6:8]] = heading_vector
-    df[df.columns[8]] = heading
+    df[df.columns[0:2]] = origin_matrix
+    df[df.columns[2:4]] = point_matrix
+    df[df.columns[4:6]] = heading_vector
+    df[df.columns[6]] = heading
 
     return df
 
-def compute_turn_angles(heading_df : pd.DataFrame):
+def compute_turn_angles(heading_df : pd.DataFrame, time_array: np.ndarray) -> pd.DataFrame:
     """ Computes turning angles between headings from consecutive frames.
+        Adds a new column to heading_df dataframe 
+            (    'turn_angles',     'turn_angles')
 
     Args:
         heading_df (pd.DataFrame): vector and heading dataframe output 
@@ -279,7 +262,7 @@ def compute_turn_angles(heading_df : pd.DataFrame):
         pd.DataFrame: returns the same dataframe expanded with turning angles as a new column. 
     """
 
-    t_diff = np.diff(heading_df['Frame']['Frame'])
+    t_diff = np.diff(time_array[:,0])
     t_diff = np.insert(t_diff, [0], [0], axis=0)
 
     turn_angles = np.empty((len(t_diff), 1))
@@ -305,7 +288,7 @@ def compute_turn_angles(heading_df : pd.DataFrame):
     turn_angles[idx_v1] = np.reshape(np.arctan2(dot_with_cross, dot_product), (-1, 1))
 
     # temp_df = pd.DataFrame(turn_angles)
-    # results_structure = [['turn_angles'], ['turn_angles']]
+    # results_structure = [['turn_angles'], ['turn_angles']] 
     # tuples = list(zip(*results_structure))
     # temp_df.columns = pd.MultiIndex.from_tuples(tuples)
 
@@ -314,6 +297,132 @@ def compute_turn_angles(heading_df : pd.DataFrame):
     heading_df[new_columns] = turn_angles
 
     return heading_df
+
+def compute_tail_curvature_metrics(heading_vector : np.ndarray,
+                                   time_array : np.ndarray,
+                                   tail_points : np.ndarray,
+                                   truncate=None,
+                                   **kwargs):
+    """ Computes the vector-based tail curvature metrics. Adds the following new columns to the
+        heading_df pd.DataFrame 
+
+         (  'tail_vector_1',               'x'),
+         (  'tail_vector_1',               'y'),
+         (  'tail_vector_2',               'x'),
+         (  'tail_vector_2',               'y'),
+         (   'tail_angle_1',           'angle'),
+         (   'tail_angle_2',           'angle'),
+         (            'mtc',             'mtc'),
+         (   'mtc_velocity',    'mtc_velocity'),
+         (      'mtc_accel',       'mtc_accel')
+    Args:
+        heading_vector (np.ndarray): normalized heading vector matrix (n-by-2)
+        tail_points (np.ndarray): tail points coordinate matrix, if using our dlc model
+        it is commonly shape n-by-22 (swim bladder + 10 tail point coordinates)
+        truncate (int, optional): tail point number where tail angles and mean tail point 
+            calculation will be truncated (example, truncate of 8 will only use the 
+            first 8 tail points for angles and mean tail curvature calculation). 
+            Defaults to None. If none uses all tail points to 
+            calculate tail angles and mean tail curvature.
+    kwargs:
+        'smooth' (int): window size, in frames (smooth > 3), with which to smooth the tail 
+            segment angle data. Uses the savitzky-golay filter (polyorder=3). 
+            This will help smooth the mean tail curvature metrics (mtc, mtc_velocity, mtc_accel)
+    
+    Raises:
+        ValueError: If the num. of observations in heading vector (rows) does not match num. obs.
+            (rows) in tail_points, stop computations.
+
+    Returns:
+        dictionary: dictionary with two keys: 'tail_angles' and 'mtc', containing with tail angles 
+            (n-by-m, m=truncate) and mean tail curvature results (n-by-1), respectively.
+    """
+
+    n_obs, n_cols = tail_points.shape
+
+    if 'smooth' in kwargs:
+        SMOOTH = kwargs['smooth']
+    else:
+        SMOOTH = None
+
+    if truncate is None:
+        truncate = int((n_cols/2 - 1))
+
+    # print(f"truncate value is now {truncate} and number of tail points is {n_cols/2-1}")
+
+    diff = int((n_cols/2 -1) - truncate)
+
+    # print(f"""difference in number of tail points to truncate and actual
+            #   number of tail points: {diff}""")
+
+    if diff != 0:
+        stop_point = - diff*2
+        tail_vectors = tail_points[:, 2:stop_point] - tail_points[:, :stop_point-2]
+    else:
+        tail_vectors = tail_points[:, 2:] - tail_points[:, :-2]
+
+    n_obs, n_cols = tail_vectors.shape
+
+    # reshape data in a way that we can compute the angles efficiently
+    flat_tail_vectors = tail_vectors.reshape((-1,2))
+
+    repeated_hvs = np.tile(-heading_vector, (1,truncate))
+    repeated_hvs = repeated_hvs.reshape((-1,2))
+
+    #check if shapes match, otherwise stop computation
+    if flat_tail_vectors.shape != repeated_hvs.shape:
+        raise ValueError("Tail vectors not the same size as repeated heading vectors")
+
+    #add the third dimension populated with zeros for the cross product
+    repeated_hvs = np.hstack((repeated_hvs, np.zeros((repeated_hvs.shape[0],1))))
+
+    #normalize tail vectors and add third dimension populated with zeros for cross product
+    flat_tail_vectors = flat_tail_vectors / np.reshape(np.linalg.norm(flat_tail_vectors, axis=1), \
+                                                       (-1, 1))
+    flat_tail_vectors = np.hstack((flat_tail_vectors, np.zeros((flat_tail_vectors.shape[0],1))))
+
+    # compute tail angles with respect to inverted heading vector
+    dot_product = np.einsum('ij,ij->i', flat_tail_vectors, repeated_hvs)
+    cross_product = np.cross(flat_tail_vectors, repeated_hvs)
+    dot_with_cross = np.dot(cross_product, [0, 0, 1])
+    tail_angles = np.reshape(np.arctan2(dot_with_cross, dot_product), (-1, truncate))
+
+    tail_angles = np.degrees(tail_angles)
+
+    # compute mean tail curvature
+    if SMOOTH is not None:
+        # print("smoothing tail angles")
+        tail_angles = savgol_filter(tail_angles, SMOOTH, polyorder=3, axis=0)
+    mean_tail_curvature = np.mean(tail_angles, axis=1)
+
+    full_output = {'tail_vectors': flat_tail_vectors[:,:2].reshape((n_obs, truncate*2)),
+                   'tail_angles': tail_angles,
+                   'mtc': mean_tail_curvature}
+
+    results_structure = [[],[]]
+
+    for i in range(1,truncate+1):
+        results_structure[0].extend(['tail_vector_' + str(i), 'tail_vector_' + str(i)])
+    for i in range(1,truncate+1):
+        results_structure[0].extend(['tail_angle_' + str(i)])
+
+    results_structure[1].extend(['x', 'y'] * truncate)
+    results_structure[1].extend(['angle'] * truncate)
+    results_structure[0].extend(['mtc', 'mtc_velocity', 'mtc_accel'])
+    results_structure[1].extend(['mtc', 'mtc_velocity', 'mtc_accel'])
+
+    mtc_velocity = compute_derivative(mean_tail_curvature, x=time_array[:,1], pad=True)
+    mtc_accel = compute_derivative(mtc_velocity, x=time_array[:,1], pad=True)
+
+    tuples = list(zip(*results_structure))
+    results_structure = pd.MultiIndex.from_tuples(tuples)
+    df = pd.DataFrame(data=np.hstack([full_output['tail_vectors'],
+                                      full_output['tail_angles'],
+                                      full_output['mtc'].reshape((-1,1)),
+                                      mtc_velocity.reshape((-1,1)),
+                                      mtc_accel.reshape((-1,1))]), columns=results_structure)
+
+    return df
 
 def find_repeats(input_array) -> np.ndarray:
     """

@@ -4,17 +4,19 @@
 """
 import numpy as np
 import pandas as pd
-from scipy.signal import savgol_filter, detrend, find_peaks
+from scipy.signal import detrend, find_peaks
 from scipy.fft import fft, fftfreq
 from .utils import compute_derivative, get_body_center
 from .utils import compute_base_and_heading, compute_turn_angles
+from .utils import compute_tail_curvature_metrics
 from .utils import quick_smooth, find_repeats, process_bout_overlaps
 
 def get_point_metrics(dataframe : pd.DataFrame,
                       bodypart : str,
                       mask=None,
                       px_tolerances=(0.0, 1000),
-                      movavg=None, **kwargs):
+                      movavg=None,
+                      **kwargs) -> pd.DataFrame:
     """ Computes point-based metrics from a pd.DataFrame with a dlc result structure.  
         Calcualates normalized x and y positions, distance from image center (for square videos),
          distance travelled, speeds and acceleration.
@@ -168,23 +170,23 @@ def get_point_metrics(dataframe : pd.DataFrame,
         coords_smooth = np.full(dataframe[scorer][bodypart][['x', 'y']].values.shape, np.nan)
         coords_smooth[mask, :] = dataframe[scorer][bodypart][['x', 'y']].values[mask]
 
-        if (kwargs['movavg'] % 2) == 0:
+        if (movavg % 2) == 0:
             temp_coords = np.vstack((np.repeat(coords_smooth[mask,:][0].reshape(1,2),
-                                               int((kwargs['movavg']-1)/2), axis=0),
+                                               int((movavg-1)/2), axis=0),
                                                coords_smooth[mask,:],
                                      np.repeat(coords_smooth[mask,:][-1].reshape(1,2),
-                                               int(kwargs['movavg']/2), axis=0)))
-        if (kwargs['movavg'] % 2) == 1:
+                                               int(movavg/2), axis=0)))
+        if (movavg % 2) == 1:
             temp_coords = np.vstack((np.repeat(coords_smooth[mask,:][0].reshape(1,2),
-                                               int(kwargs['movavg']/2), axis=0),
+                                               int(movavg/2), axis=0),
                                                coords_smooth[mask,:],
                                      np.repeat(coords_smooth[mask,:][-1].reshape(1,2),
-                                               int(kwargs['movavg']/2), axis=0)))
+                                               int(movavg/2), axis=0)))
 
-        x_coords = np.convolve(temp_coords[:,0], np.ones(kwargs['movavg']),
-                               mode='valid') / kwargs['movavg']
-        y_coords = np.convolve(temp_coords[:,1], np.ones(kwargs['movavg']),
-                               mode='valid') / kwargs['movavg']
+        x_coords = np.convolve(temp_coords[:,0], np.ones(movavg),
+                               mode='valid') / movavg
+        y_coords = np.convolve(temp_coords[:,1], np.ones(movavg),
+                               mode='valid') / movavg
         coords_smooth[mask, :] = np.column_stack((x_coords, y_coords))
 
         #same block of calculations done with the smoothed coordinates
@@ -315,7 +317,7 @@ def get_vector_metrics(dataframe: pd.DataFrame, keypoints_to_vectors : list, mas
                                   point,
                                   truncate=TRUNCATE_TAIL_SEGS,
                                   smooth=SMOOTH)
-    df = compute_turn_angles(df)
+    df = compute_turn_angles(df, time_array=time_array)
 
     # add new columns to df so it later receives the outputs from compute_tail_curvature_metrics()
     results_structure = [[],[]]
@@ -334,7 +336,7 @@ def get_vector_metrics(dataframe: pd.DataFrame, keypoints_to_vectors : list, mas
         df[column] = np.nan
 
     # prepare inputs for compute_tail_curvature_metrics()
-    heading_vector = df.iloc[:,6:8].values
+    heading_vector = df.iloc[:,4:6].values
     tail_list = []
 
     for coord in ['x', 'y']:
@@ -351,122 +353,6 @@ def get_vector_metrics(dataframe: pd.DataFrame, keypoints_to_vectors : list, mas
 
     for key, values in mtc_metrics.items():
         df[key] = values
-
-    return df
-
-def compute_tail_curvature_metrics(heading_vector : np.ndarray,
-                                   time_array : np.ndarray,
-                                   tail_points : np.ndarray,
-                                   truncate=None,
-                                   **kwargs):
-    """_summary_
-
-    Args:
-        heading_vector (np.ndarray): normalized heading vector matrix (n-by-2)
-        tail_points (np.ndarray): tail points coordinate matrix, if using our dlc model
-        it is commonly shape n-by-22 (swim bladder + 10 tail point coordinates)
-        truncate (int, optional): tail point number where tail angles and mean tail point 
-            calculation will be truncated (example, truncate of 8 will only use the 
-            first 8 tail points for angles and mean tail curvature calculation). 
-            Defaults to None. If none uses all tail points to 
-            calculate tail angles and mean tail curvature.
-    kwargs:
-        'smooth' (int): window size, in frames (smooth > 3), with which to smooth the tail 
-            segment angle data. Uses the savitzky-golay filter (polyorder=3). 
-            This will help smooth the mean tail curvature metrics (mtc, mtc_velocity, mtc_accel)
-    
-    Raises:
-        ValueError: If the num. of observations in heading vector (rows) does not match num. obs.
-            (rows) in tail_points, stop computations.
-
-    Returns:
-        dictionary: dictionary with two keys: 'tail_angles' and 'mtc', containing with tail angles 
-            (n-by-m, m=truncate) and mean tail curvature results (n-by-1), respectively.
-    """
-
-    n_obs, n_cols = tail_points.shape
-
-    if 'smooth' in kwargs:
-        SMOOTH = kwargs['smooth']
-    else:
-        SMOOTH = None
-
-    if truncate is None:
-        truncate = int((n_cols/2 - 1))
-
-    # print(f"truncate value is now {truncate} and number of tail points is {n_cols/2-1}")
-
-    diff = int((n_cols/2 -1) - truncate)
-
-    # print(f"""difference in number of tail points to truncate and actual
-            #   number of tail points: {diff}""")
-
-    if diff != 0:
-        stop_point = - diff*2
-        tail_vectors = tail_points[:, 2:stop_point] - tail_points[:, :stop_point-2]
-    else:
-        tail_vectors = tail_points[:, 2:] - tail_points[:, :-2]
-
-    n_obs, n_cols = tail_vectors.shape
-
-    # reshape data in a way that we can compute the angles efficiently
-    flat_tail_vectors = tail_vectors.reshape((-1,2))
-
-    repeated_hvs = np.tile(-heading_vector, (1,truncate))
-    repeated_hvs = repeated_hvs.reshape((-1,2))
-
-    #check if shapes match, otherwise stop computation
-    if flat_tail_vectors.shape != repeated_hvs.shape:
-        raise ValueError("Tail vectors not the same size as repeated heading vectors")
-
-    #add the third dimension populated with zeros for the cross product
-    repeated_hvs = np.hstack((repeated_hvs, np.zeros((repeated_hvs.shape[0],1))))
-
-    #normalize tail vectors and add third dimension populated with zeros for cross product
-    flat_tail_vectors = flat_tail_vectors / np.reshape(np.linalg.norm(flat_tail_vectors, axis=1), \
-                                                       (-1, 1))
-    flat_tail_vectors = np.hstack((flat_tail_vectors, np.zeros((flat_tail_vectors.shape[0],1))))
-
-    # compute tail angles with respect to inverted heading vector
-    dot_product = np.einsum('ij,ij->i', flat_tail_vectors, repeated_hvs)
-    cross_product = np.cross(flat_tail_vectors, repeated_hvs)
-    dot_with_cross = np.dot(cross_product, [0, 0, 1])
-    tail_angles = np.reshape(np.arctan2(dot_with_cross, dot_product), (-1, truncate))
-
-    tail_angles = np.degrees(tail_angles)
-
-    # compute mean tail curvature
-    if SMOOTH is not None:
-        # print("smoothing tail angles")
-        tail_angles = savgol_filter(tail_angles, SMOOTH, polyorder=3, axis=0)
-    mean_tail_curvature = np.mean(tail_angles, axis=1)
-
-    full_output = {'tail_vectors': flat_tail_vectors[:,:2].reshape((n_obs, truncate*2)),
-                   'tail_angles': tail_angles,
-                   'mtc': mean_tail_curvature}
-
-    results_structure = [[],[]]
-
-    for i in range(1,truncate+1):
-        results_structure[0].extend(['tail_vector_' + str(i), 'tail_vector_' + str(i)])
-    for i in range(1,truncate+1):
-        results_structure[0].extend(['tail_angle_' + str(i)])
-
-    results_structure[1].extend(['x', 'y'] * truncate)
-    results_structure[1].extend(['angle'] * truncate)
-    results_structure[0].extend(['mtc', 'mtc_velocity', 'mtc_accel'])
-    results_structure[1].extend(['mtc', 'mtc_velocity', 'mtc_accel'])
-
-    mtc_velocity = compute_derivative(mean_tail_curvature, x=time_array[:,1], pad=True)
-    mtc_accel = compute_derivative(mtc_velocity, x=time_array[:,1], pad=True)
-
-    tuples = list(zip(*results_structure))
-    results_structure = pd.MultiIndex.from_tuples(tuples)
-    df = pd.DataFrame(data=np.hstack([full_output['tail_vectors'],
-                                      full_output['tail_angles'],
-                                      full_output['mtc'].reshape((-1,1)),
-                                      mtc_velocity.reshape((-1,1)),
-                                      mtc_accel.reshape((-1,1))]), columns=results_structure)
 
     return df
 
@@ -617,7 +503,8 @@ def bout_detector(
         dict: A dictionary containing various metrics for each detected bout.
     """
     # Get main keypoint name
-    keypt_name = all_metrics.columns.get_level_values(0)[2]
+    print(all_metrics.columns.get_level_values(0))
+    keypt_name = all_metrics.columns.get_level_values(0)[5]
     # Grab point metrics
     distance_mm = all_metrics[(keypt_name, 'dist_travelled')].values
     acceleration = all_metrics[(keypt_name, 'acceleration')].values
@@ -720,22 +607,35 @@ def bout_detector(
 
     return bout_metric
 
-def compute_bout_metrics(all_metrics_df:pd.DataFrame,
+def compute_single_bout_metrics(all_metrics_df:pd.DataFrame,
                          onset_offset:tuple,
                          FPS=1,
                          smooth_point=None,
                          smooth_vector= None,
-                         smooth_vigor_window=40) -> dict:
-    """ computes bout metrics of a single bout 
+                         smooth_vigor_window=43) -> dict:
+
+    """ computes bout metrics of a single bout.
 
     Args:
-        all_metrics_df (pd.DataFrame): _description_
-        bouts_dict (dict): _description_
-        FPS (int, optional): _description_. Defaults to 1.
-        smooth_params (_type_, optional): _description_. Defaults to None.
+        all_metrics_df (pd.DataFrame): frame-by-frame kinematic data (output from get_all_metrics)
+        onset_offset (tuple): tuple where first and second elements comprise of bout 
+            onset and offset, respectively.
+        FPS (int, optional): recording framerate (in Hz). Defaults to 1.
+        smooth_point (tuple, optional): parameters to smooth point metrics. First element
+            is a string (at the moment only 'mean' is an option), second element is the time window
+            in miliseconds to run the moving average with. Defaults to None.
+        smooth_vector (tuple, optional): parameters to smooth vector metrics. First element
+            is a string (at the moment only 'mean' is an option), second element is the time window
+            in miliseconds to run the moving average ('mean') with. Defaults to None.
+        smooth_vigor_window (int, optional): time window in miliseconds to run the vigor calculation
+            with a moving average. Defaults to 43 ms.
+
+    Returns:
+        dict: bout metrics with keys as metrics names, values are their values.
     """
+
     # Get main keypoint name
-    keypt_name = all_metrics_df.columns.get_level_values(0)[2]
+    keypt_name = all_metrics_df.columns.get_level_values(0)[5]
 
     if smooth_point[0] == 'mean':
         window = int(smooth_point[1] / (1000*(1/FPS)))
@@ -777,7 +677,7 @@ def compute_bout_metrics(all_metrics_df:pd.DataFrame,
 
     # whole-body displacement related (point-based metrics)
     total_distance = np.nansum(dt_values[onset:offset])
-    average_speed = total_distance / duration/1000
+    average_speed = total_distance / (duration/1000)
     max_point_speed = np.nanmax(velocity[onset:offset])
     max_point_accel = np.nanmax(acceleration[onset:offset])
 
@@ -799,7 +699,7 @@ def compute_bout_metrics(all_metrics_df:pd.DataFrame,
     # tail segment related (vector-based)
     tail_angle_names = [var for var in all_metrics_df.columns.get_level_values(0) \
                         if 'tail_angle_' in var]
-    columns = zip(tail_angle_names, ['angle']*(len(tail_angle_names)-1))
+    columns = zip(tail_angle_names, ['angle']*(len(tail_angle_names)))
     tail_max_amplitude = np.max(np.abs(all_metrics_df[columns].values[onset:offset]), axis=0)
 
     # vigor related
@@ -819,7 +719,9 @@ def compute_bout_metrics(all_metrics_df:pd.DataFrame,
     bout_end_angle = np.min([bout_end_angle, bout_end_angle2], axis=0)
 
     bout_dict = {'onset': onset_offset[0],
-                 'offset': onset_offset[1]}
+                 'offset': onset_offset[1],
+                 'onset_s': onset_offset[0]/FPS,
+                 'offset_s': onset_offset[1]/FPS}
     
     bout_dict.update({'duration': duration,                         # in miliseconts
                       'total_distance': total_distance,             # in milimeters
@@ -843,3 +745,88 @@ def compute_bout_metrics(all_metrics_df:pd.DataFrame,
                        for i in range(len(tail_angle_names))})
 
     return bout_dict
+
+def compute_bout_metrics(bouts_dict : dict, all_metrics_df : pd.DataFrame, FPS=1, **kwargs) -> dict:
+    """
+        Computes bout metrics of a set of swim bouts. 
+    Args:
+        bouts_dict (dict): dictionary containing the bout onset and offset indices 
+            (output from bout_detector).
+        all_metrics_df (pd.DataFrame): frame-by-frame kinematic data (output from get_all_metrics)
+
+    Returns:
+        dict: dictionary containing all bout metrics, easily transformed into a pd.Dataframe.
+    """
+
+    if 'smooth_point' in kwargs:
+        smooth_point = kwargs['smooth_point']
+    else:
+        smooth_point = None
+
+    if 'smooth_vector' in kwargs:
+        smooth_vector = kwargs['smooth_vector']
+    else:
+        smooth_vector = None
+
+    if 'smooth_vigor_window' in kwargs:
+        smooth_vigor_window = kwargs['smooth_vigor_window']
+    else:
+        smooth_vigor_window = 40
+
+    if 'end_time' in kwargs:
+        end_time = kwargs['end_time']
+    else:
+        end_time = None  
+
+    onsets = bouts_dict['onset']
+    offsets = bouts_dict['offset']
+
+    on_and_offsets = list(zip(onsets,offsets))
+    print(on_and_offsets)
+    bout_metrics = {}
+
+    first_run = True
+    for on_and_offset in on_and_offsets:
+        single_bout_dict = compute_single_bout_metrics(all_metrics_df,
+                                                       on_and_offset,
+                                                       FPS=FPS,
+                                                       smooth_point=smooth_point,
+                                                       smooth_vector=smooth_vector,
+                                                       smooth_vigor_window=smooth_vigor_window)
+        if not first_run:
+            for key, value in single_bout_dict.items():
+                bout_metrics[key] = np.append(bout_metrics[key], value)
+        if first_run:
+            bout_metrics.update({key : np.array([value])
+                                 for key, value in single_bout_dict.items()})
+            first_run = False
+
+    bout_metrics['IBI'] = compute_ibi(onsets, time_array=all_metrics_df[('Time', 'Time')].values, end_time=end_time)
+    bout_metrics['bout_number'] = np.arange(1,len(onsets)+1)
+    
+    return bout_metrics
+
+def compute_ibi(bout_onsets: list, time_array : np.ndarray, end_time=None) -> np.ndarray:
+    """ Computes the interbout interval (IBI, i.e. time elapsed between start of current bout until
+        the start of the next bout) for a set of bouts. Output unit of measure is the
+        same as time_array units. 
+
+    Args:
+        bouts (list): list containing indices of where bouts start. 
+        time_array (np.ndarray): time vector used to compute IBI
+        end_time (_type_, optional): user-defined end time to calculate IBI of last bout.
+            Since IBI is a paired measurement (the IBI of one bout depends on the existence of a 
+            following swim bout), you can define a end time so the last bout has an IBI. 
+            Defaults to None. None will output np.nan as the IBI of the last bout.
+    
+    Returns:
+        np.ndarray: IBI values for each bout.
+    """
+    if end_time is not None:
+        start_times = time_array[bout_onsets]
+        start_times = np.append(start_times, end_time)
+        return np.diff(start_times)
+    else:
+        ibi = np.diff(time_array[bout_onsets])
+        ibi = np.append(ibi, np.nan)
+        return ibi
