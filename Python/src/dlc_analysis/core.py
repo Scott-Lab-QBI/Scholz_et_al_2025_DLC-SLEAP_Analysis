@@ -356,13 +356,13 @@ def get_vector_metrics(dataframe: pd.DataFrame, keypoints_to_vectors : list, mas
 
     return df
 
-def get_all_metrics(dataframe : pd.DataFrame,
+def get_all_metrics(dataframe,
                     exp_metadata: dict,
                     bodyparts_dict: dict,
                     pcutoff=0.8,
                     mask=None,
                     px_tolerances=(0,1000),
-                    **kwargs) -> pd.DataFrame:
+                    **kwargs):
 
     """ Computes all point- and vector-based metrics from a dlc output dataframe
 
@@ -503,7 +503,6 @@ def bout_detector(
         dict: A dictionary containing various metrics for each detected bout.
     """
     # Get main keypoint name
-    print(all_metrics.columns.get_level_values(0))
     keypt_name = all_metrics.columns.get_level_values(0)[5]
     # Grab point metrics
     distance_mm = all_metrics[(keypt_name, 'dist_travelled')].values
@@ -782,7 +781,6 @@ def compute_bout_metrics(bouts_dict : dict, all_metrics_df : pd.DataFrame, FPS=1
     offsets = bouts_dict['offset']
 
     on_and_offsets = list(zip(onsets,offsets))
-    print(on_and_offsets)
     bout_metrics = {}
 
     first_run = True

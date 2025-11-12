@@ -5,6 +5,7 @@ from copy import copy
 import numpy as np
 import pandas as pd
 from scipy.signal import savgol_filter
+import h5py
 
 def compute_derivative(values : np.ndarray,
                        pad=False,
@@ -51,11 +52,15 @@ def compute_derivative(values : np.ndarray,
             right_dx = np.diff(x, append= x[-1])
             left_dx = np.diff(x, prepend =x[0])
 
-            right = right / right_dx
-            left = left / left_dx
+            # right = right / right_dx
+            # left = left / left_dx
+            right = np.divide(right, right_dx, out=np.full_like(right, np.nan, dtype=float), where=right_dx!=0)
+            left = np.divide(left, left_dx, out=np.full_like(left, np.nan, dtype=float), where=left_dx!=0)
 
         if not pad:
-            diffs = np.diff(values) / np.diff(x)
+            # diffs = np.diff(values) / np.diff(x)
+            dx = np.diff(x)
+            diffs = np.divide(np.diff(values), dx, out=np.full_like(dx, np.nan, dtype=float), where=dx!=0)
             right = np.insert(diffs, -1, np.nan)
             left = np.insert(diffs, 0, np.nan)
 
@@ -539,4 +544,55 @@ def process_bout_overlaps(bout_metric : dict, merge_threshold=0.95) -> dict:
 
     processed_bout_metric = {'onset': onsets, 'offset': offsets}
     return processed_bout_metric
-    
+
+def sleap_to_dlc_format(sleap_hdf5_path, indices=None):
+    """Converts a sleap hdf5 file to a pandas DataFrame
+    Args:
+        sleap_hdf5_path (string): path to sleap predictions hdf5 file
+        indices (list, optional): list of indices of the frames to extract. Default is to use all frames. 
+
+    Returns:
+        _type_: pd.DataFrame
+    """    
+    with h5py.File(sleap_hdf5_path, "r") as f:
+        locations = f["tracks"][:].T
+        node_names = [n.decode() for n in f['node_names'][:]]
+
+        if indices == None:
+            locations = locations[:,:,:,0].reshape(-1,len(node_names)*2)
+        else:
+            locations = locations[indices,:,:,0].reshape(-1,len(node_names)*2)
+
+        # print(locations.shape)
+        
+        columns = create_df_header(node_names)
+        results_structure = pd.MultiIndex.from_tuples(columns)
+        if indices != None:
+            df = pd.DataFrame(data=locations, columns=results_structure, index=indices)
+        else:
+            df = pd.DataFrame(data=locations, columns=results_structure)
+        
+        return df
+
+def create_df_header(keypoint_names: list):
+    """From a list of keypoint names, create the DeepLabCut output style header. 
+
+    Args:
+        keypoint_names (list): list of string with the names of the animal pose keypoints.
+
+    Returns:
+        list: list of tuples that form the header of a pd.MultiIndex to be fed to 
+        pd.MultiIndex_from_tuples().
+    """
+
+    top_level = []
+    bottom_level = []
+    for keypt in keypoint_names: 
+        top_level.extend([keypt]*2)
+        bottom_level.extend(['x', 'y'])
+
+    scorer_level = 'scorer'*len(top_level)
+    columns_structure = [scorer_level, top_level, bottom_level]
+    columns_structure = list(zip(*columns_structure))
+
+    return columns_structure

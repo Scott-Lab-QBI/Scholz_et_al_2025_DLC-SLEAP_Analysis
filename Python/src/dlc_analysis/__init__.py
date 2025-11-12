@@ -16,3 +16,6 @@ from .utils import compute_tail_curvature_metrics
 from .utils import find_repeats
 from .utils import quick_smooth
 from .utils import process_bout_overlaps
+from .utils import sleap_to_dlc_format
+from .utils import create_df_header
+

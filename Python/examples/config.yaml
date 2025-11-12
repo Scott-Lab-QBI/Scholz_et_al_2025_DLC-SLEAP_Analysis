@@ -1,0 +1,62 @@
+# ===================================================================
+# Configuration for dlc/sleap-analysis pipeline (run_demo.py)
+# ===================================================================
+
+# --- File Path Configuration ---
+# Path to the folder containing the .h5 tracking files from DLC/SLEAP.
+tracking_folder_path: "C:\\Users\\lscholz\\Downloads\\Examples" 
+
+# --- Experiment Metadata ---
+# These values are used to convert pixels to physical units and frames to time.
+experiment_specs:
+  resolution_mmpx: 0.06  # Spatial resolution in millimeters per pixel.
+camera_specs:
+  frame_rate: 300        # Video frame rate in frames per second (FPS).
+  width: 254            # Width of the video frame in pixels.
+
+# --- Bodypart Definitions ---
+# Defines which keypoints are used for different calculations.
+bodyparts_dict:
+  # List of keypoints to average for calculating the center of the body.
+  point_metrics:
+    - 'L_eye_top'
+    - 'R_eye_top'
+    - 'L_eye_bottom'
+    - 'R_eye_bottom'
+    - 'swim_bladder'
+  # Defines the heading vector.
+  # First list: keypoint(s) for the vector origin.
+  # Second list: keypoint(s) for the vector tip.
+  vector_metrics:
+    - ['swim_bladder']
+    - ['L_eye_top', 'R_eye_top', 'L_eye_bottom', 'R_eye_bottom']
+
+# -- Result type configuration --
+# either 'DLC' or 'SLEAP'
+result_type: 'DLC'
+result_pattern: 'DLC_resnet152_ZF-RoscoSep13shuffle1_5400000'
+
+# --- Function-specific Parameters ---
+
+# Parameters for get_all_metrics()
+metrics_params:
+  pcutoff: 0.8             # Likelihood threshold from pose estimation to consider a point valid.
+  px_tolerances: [0.15, 60]  # Min/max pixel distance change between frames to be considered valid movement.
+  point_movavg: 7          # Window size (frames) for moving average on point metrics (e.g., position).
+  vector_smooth: 9         # Window size (frames) for Savitzky-Golay filter on vector metrics (e.g., heading).
+  truncate_tail_pts: 9     # Number of tail points (from base) to use for tail curvature metrics.
+
+# Parameters for bout_detector()
+bout_detection_params:
+  smooth_window: 5              # Window size (frames) for smoothing distance signal before peak detection.
+  min_peak_separation: 0.1667   # Minimum time in seconds between bouts.
+  min_peak_prominence: 0.01     # Minimum prominence of a peak to be considered a valid bout.
+  num_repeats: 7                # Num consecutive frames of low movement to define start/end of a bout.
+
+# Parameters for compute_bout_metrics()
+bout_metrics_params:
+  smooth_point: ['mean', 30]    # Smoothing for point metrics ('type', window_ms).
+  smooth_vector: ['mean', 10]   # Smoothing for vector metrics ('type', window_ms).
+  smooth_vigor_window: 44       # Vigor smoothing window in ms.
+  end_time: 6                   # End time in seconds for calculating the IBI of the final bout. if
+                                # you want the last bout to have an IBI value (not np.nan)
