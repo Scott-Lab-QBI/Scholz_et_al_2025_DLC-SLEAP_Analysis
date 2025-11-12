@@ -232,7 +232,8 @@ Python/
 │       ├── __init__.py     # Makes the directory a Python package
 │       ├── core.py         # High-level functions (get_all_metrics, bout_detector, etc.)
 │       └── utils.py        # Low-level helper functions (derivatives, geometry, etc.)
-└── README.md               # This file
+├── README.md               # This file
+└── requirements.txt        # Python dependencies
 ```
 
 ## License
