@@ -1,5 +1,5 @@
 """
-    Auxiliary functions used in .core to compute kinematic parameters.
+    Auxiliary functions used in core.py to compute kinematic parameters.
 """
 from copy import copy
 import numpy as np

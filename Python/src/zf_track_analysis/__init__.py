@@ -1,5 +1,5 @@
 """
-    calls to functions in .core and .utils. 
+    Top-level package for zf_track_analysis.
 """
 # src/mypackage/__init__.py
 
@@ -18,4 +18,3 @@ from .utils import quick_smooth
 from .utils import process_bout_overlaps
 from .utils import sleap_to_dlc_format
 from .utils import create_df_header
-

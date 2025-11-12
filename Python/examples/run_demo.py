@@ -1,6 +1,6 @@
 """
     This script, when run as "python run_demo.py -c "path\to\config\file" " will process a folder
-    containing dlc/sleap results. See the config.yaml file for more details on the required metadata
+    containing pose-estimation results. See the config.yaml file for more details on the required metadata
     and parameters. 
 """
 import sys
@@ -15,7 +15,7 @@ print(src_path)
 if str(src_path) not in sys.path:
     sys.path.append(str(src_path))
 
-import dlc_analysis
+import zf_track_analysis
 
 if __name__ == '__main__':
 
@@ -59,21 +59,21 @@ if __name__ == '__main__':
 
     for file in file_list:
         if result_type == 'SLEAP':
-            df = dlc_analysis.sleap_to_dlc_format(file)
+            df = zf_track_analysis.sleap_to_dlc_format(file)
         if result_type == 'DLC':
             df = pd.read_hdf(file)
 
         scorer = df.columns.get_level_values(0)[0]
 
-        all_metrics = dlc_analysis.get_all_metrics(df,
+        all_metrics = zf_track_analysis.get_all_metrics(df,
                                                    exp_metadata=exp_metadata,
                                                    bodyparts_dict=bodyparts_dict,
                                                    **metrics_params)
 
         print("     Finished computing frame-by-frame kinematic metrics. Detecting bouts now...")
-        bouts = dlc_analysis.bout_detector(all_metrics, frame_rate=fps, **bout_detection_params)
+        bouts = zf_track_analysis.bout_detector(all_metrics, frame_rate=fps, **bout_detection_params)
 
-        bouts_df = dlc_analysis.compute_bout_metrics(bouts,
+        bouts_df = zf_track_analysis.compute_bout_metrics(bouts,
                                                      all_metrics,
                                                      FPS=fps,
                                                      **bout_metrics_params)

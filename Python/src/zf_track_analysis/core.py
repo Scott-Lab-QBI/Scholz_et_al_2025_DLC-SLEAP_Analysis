@@ -1,6 +1,6 @@
 """
-    Core functions to compute kinematic parameters from free-swimming behavioural 
-    data results obtained from pose-estimation models such as DLC and SLEAP. 
+    Core functions to compute kinematic parameters from free-swimming behavioural
+    data results obtained from pose-estimation models.
 """
 import numpy as np
 import pandas as pd
