@@ -4,7 +4,7 @@
 
 # --- File Path Configuration ---
 # Path to the folder containing the .h5 tracking files from DLC/SLEAP.
-tracking_folder_path: "C:\\Users\\lscholz\\Downloads\\Examples" 
+tracking_folder_path: "..\\.." 
 
 # --- Experiment Metadata ---
 # These values are used to convert pixels to physical units and frames to time.
@@ -34,7 +34,7 @@ bodyparts_dict:
 # -- Result type configuration --
 # either 'DLC' or 'SLEAP'
 result_type: 'DLC'
-result_pattern: 'DLC_resnet152_ZF-RoscoSep13shuffle1_5400000'
+result_pattern: 'dlc_output'
 
 # --- Function-specific Parameters ---
 
