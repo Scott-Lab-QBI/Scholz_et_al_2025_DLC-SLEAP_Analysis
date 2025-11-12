@@ -65,8 +65,7 @@ We also provide the annotated datasets used to train and compare the models, whi
     ```bash
     pip install -r requirements.txt
     ```
-4. **Run demo**
-   On the command prompt, make sure you the working directory is changed to the `examples`. 
+4. **Run demo using ``demo_dlc_output.h5`` file:** On the command prompt, make sure you the working directory is changed to the `examples`. 
    ```
    cd examples
    ```
