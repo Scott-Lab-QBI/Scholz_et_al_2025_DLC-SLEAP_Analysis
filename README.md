@@ -55,13 +55,28 @@ We also provide the annotated datasets used to train and compare the models, whi
     ```bash
     conda create -n zf_track_analysis python=3.10
     ```
-    Then activate it by calling `conda activate zf_track_analysis`
+    Then activate it by calling 
+    ```bash
+    conda activate zf_track_analysis
+    ```
 
 3.  **Install dependencies:**
     The required packages are listed in `requirements.txt`.
     ```bash
     pip install -r requirements.txt
     ```
+4. **Run demo**
+   On the command prompt, make sure you the working directory is changed to the `examples`. 
+   ```
+   cd examples
+   ```
+   Then you can run the demo. 
+
+   ```bash
+   python run_demo.py --config config.yaml
+   ```
+   The demo will only run if you execute pyhton from the examples folder, as the ``config.yaml`` file gives the relative path where the ``demo_dlc_output.h5``is located, but if you want you can change that in ``config.yaml`` file so it has an absolute path to the demo.
+
 ## Using as a Library
 
 Beyond running the provided demo and notebook, you can import `zf_track_analysis` into your own Python scripts or Jupyter notebooks to use its functions. Since the package is used locally and not installed from PyPI, you must first add the project's `src` directory to your Python path.
