@@ -85,7 +85,7 @@ def get_body_center(dataframe : pd.DataFrame,
             datapoints with likelihood lower than pcutoff. Defaults to False.
         pcutoff (float, optional): likelihood cutoff to calculate centroid. 
             This means, if the likelihood of that keypoint's prediction is lower than the pcutoff, 
-            that point will not be used to calculate the centroid. Defaults to 0.2.
+            that point will not be used to calculate the centroid. Defaults to 0.8.
 
     Returns:
         df (pandas.DataFrame): dataframe with the new keypoint data named

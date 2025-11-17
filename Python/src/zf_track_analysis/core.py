@@ -18,7 +18,7 @@ def get_point_metrics(dataframe : pd.DataFrame,
                       movavg=None,
                       **kwargs) -> pd.DataFrame:
     """ Computes point-based metrics from a pd.DataFrame with a dlc result structure.  
-        Calcualates normalized x and y positions, distance from image center (for square videos),
+        Calculates normalized x and y positions, distance from image center (for square videos),
          distance travelled, speeds and acceleration.
         Variable names: 
             'x', 'y', 'x_norm', 'y_norm', 'likelihood', 'dist_travelled',
