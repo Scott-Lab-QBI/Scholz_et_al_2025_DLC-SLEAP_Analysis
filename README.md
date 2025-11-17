@@ -65,8 +65,7 @@ We also provide the annotated datasets used to train and compare the models, whi
     ```bash
     pip install -r requirements.txt
     ```
-4. **Run demo**
-   On the command prompt, make sure you the working directory is changed to the `examples`. 
+4. **Run demo using ``demo_dlc_output.h5`` file:** On the command prompt, make sure you the working directory is changed to the `examples`. 
    ```
    cd examples
    ```
@@ -149,7 +148,7 @@ import zf_track_analysis
 
 ## Usage
 
-The entire analysis pipeline is run from a single script, `run_demo.py`, which is configured by a YAML file.
+The entire analysis pipeline is run from a single script, `run_demo.py`, which is configured by a YAML file. These instructions now are if you want to run the workflow for your own videos (NOT ``demo_dlc_output.h5``) 
 
 ### 1. Configure the Analysis
 
@@ -218,7 +217,7 @@ bout_metrics_params:
 ```
 ### 2. Run the Script
 
-Once the `config.yaml` file is set up, run the analysis from the command line:
+Once the `config.yaml` file is set up, run the analysis from the command line (the command below assumes you are currently in the repo\Python folder):
 
 ```bash
 python examples/run_demo.py --config examples/config.yaml
