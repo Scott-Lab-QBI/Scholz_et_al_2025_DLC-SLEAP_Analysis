@@ -237,17 +237,19 @@ For each input file (e.g., `my_video.h5`), the script generates two output files
 ## Project Structure
 
 ```
-Python/
-├── examples/
-│   ├── run_demo.py         # Main script to execute the analysis
-│   └── config.yaml         # Configuration file for all parameters
-├── src/
-│   └── zf_track_analysis/
-│       ├── __init__.py     # Makes the directory a Python package
-│       ├── core.py         # High-level functions (get_all_metrics, bout_detector, etc.)
-│       └── utils.py        # Low-level helper functions (derivatives, geometry, etc.)
 ├── README.md               # This file
-└── requirements.txt        # Python dependencies
+└── Python/
+    ├── examples/
+    │   ├── run_demo.py            # Main script to execute the analysis
+    │   └── config.yaml            # Configuration file for all parameters
+    ├── src/
+    │   └── zf_track_analysis/
+    │       ├── __init__.py        # Makes the directory a Python package
+    │       ├── core.py            # High-level functions (get_all_metrics, bout_detector, etc.)
+    │       └── utils.py           # Low-level helper functions (derivatives, geometry, etc.)
+    ├── functionalities_test.ipynb # example notebook testing some of the key functions
+    └── requirements.txt           # Python dependencies
+
 ```
 
 ## License
