@@ -556,23 +556,37 @@ def sleap_to_dlc_format(sleap_hdf5_path, indices=None):
     """    
     with h5py.File(sleap_hdf5_path, "r") as f:
         locations = f["tracks"][:].T
+        likelihoods = f['point_scores'][:].T
+        
         node_names = [n.decode() for n in f['node_names'][:]]
 
-        if indices == None:
+        if indices is None:
             locations = locations[:,:,:,0].reshape(-1,len(node_names)*2)
+            likelihoods = likelihoods[:,:,0].reshape(-1, len(node_names))
+
+            n_data_pts, _ = f['instance_scores'][:].T.shape
+            results = np.empty((n_data_pts, 45))
+
+            results[:, 0::3] = locations[:,0::2]
+            results[:, 1::3] = locations[:,1::2]
+            results[:, 2::3] = likelihoods
         else:
             locations = locations[indices,:,:,0].reshape(-1,len(node_names)*2)
+            likelihoods = likelihoods[indices,:,0].reshape(-1, len(node_names))
 
-        # print(locations.shape)
-        
+            results = np.empty((len(indices), 45))
+            results[:, 0::3] = locations[indices,0::2]
+            results[:, 1::3] = locations[indices,1::2]
+            results[:, 2::3] = likelihoods[indices]
+   
         columns = create_df_header(node_names)
         results_structure = pd.MultiIndex.from_tuples(columns)
-        if indices != None:
-            df = pd.DataFrame(data=locations, columns=results_structure, index=indices)
+        if indices is not None:
+            df = pd.DataFrame(data=results, columns=results_structure, index=indices)
         else:
-            df = pd.DataFrame(data=locations, columns=results_structure)
-        
-        return df
+            df = pd.DataFrame(data=results, columns=results_structure)
+
+    return df
 
 def create_df_header(keypoint_names: list):
     """From a list of keypoint names, create the DeepLabCut output style header. 
@@ -587,11 +601,11 @@ def create_df_header(keypoint_names: list):
 
     top_level = []
     bottom_level = []
-    for keypt in keypoint_names: 
-        top_level.extend([keypt]*2)
-        bottom_level.extend(['x', 'y'])
+    for keypt in keypoint_names:
+        top_level.extend([keypt]*3)
+        bottom_level.extend(['x', 'y', 'likelihood'])
 
-    scorer_level = 'scorer'*len(top_level)
+    scorer_level = ['scorer']*len(top_level)
     columns_structure = [scorer_level, top_level, bottom_level]
     columns_structure = list(zip(*columns_structure))
 
