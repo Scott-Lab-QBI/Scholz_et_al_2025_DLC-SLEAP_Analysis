@@ -102,6 +102,10 @@ def get_body_center(dataframe : pd.DataFrame,
     # then interpolate the missing points
     if pcutoff is not None:
         mask = merged_likelihood < pcutoff
+
+        fraction_lost = np.sum(mask)/(5*dataframe.shape[0])
+        if fraction_lost > 0.1:
+            print(f"    (get_body_center) fraction of points that do not pass pcutoff: {fraction_lost:.2f}")
         # Set low-confidence points to NaN to mark them as missing
         merged_x[mask] = np.nan
         merged_y[mask] = np.nan

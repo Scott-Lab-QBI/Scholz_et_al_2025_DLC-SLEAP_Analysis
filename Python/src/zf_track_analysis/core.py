@@ -636,6 +636,7 @@ def compute_single_bout_metrics(all_metrics_df:pd.DataFrame,
     # Get main keypoint name
     keypt_name = all_metrics_df.columns.get_level_values(0)[5]
 
+
     if smooth_point[0] == 'mean':
         window = int(smooth_point[1] / (1000*(1/FPS)))
         dt_values = quick_smooth(all_metrics_df[(keypt_name, 'dist_travelled')].values,
@@ -651,19 +652,23 @@ def compute_single_bout_metrics(all_metrics_df:pd.DataFrame,
         acceleration = all_metrics_df[(keypt_name, 'acceleration')]
 
     if smooth_vector[0] == 'mean':
+        time_pts = all_metrics_df[('Time', 'Time')].values.reshape((-1,))
         window = int(smooth_vector[1] / (1000*(1/FPS)))
         mtc = all_metrics_df[('mtc', 'mtc')].rolling(window).mean().values.reshape((-1,))
         mtc_velocity = all_metrics_df[('mtc_velocity', 'mtc_velocity')] \
             .rolling(window).mean().values.reshape((-1,))
         turn_angles =  all_metrics_df[('turn_angles', 'turn_angles')] \
             .rolling(window).mean().values.reshape((-1,))
+        yaw_speed = compute_derivative(turn_angles, x=time_pts)
         heading = all_metrics_df[('heading_degrees', 'heading_degrees')] \
             .rolling(window).mean().values.reshape((-1,))
 
     if smooth_vector is None:
+        time_pts = all_metrics_df[('Time', 'Time')].values.reshape((-1,))
         mtc = all_metrics_df[('mtc', 'mtc')].values.reshape((-1,))
         mtc_velocity = all_metrics_df[('mtc_velocity', 'mtc_velocity')].values.reshape((-1,))
-        turn_angles =  all_metrics_df[('turn_angles', 'turn_angles')].values.reshape((-1,))
+        turn_angles =  all_metrics_df[('turn_angles', 'turn_angles')].values.reshape((-1,)) #yaw
+        yaw_speed = compute_derivative(turn_angles, x=time_pts)
         heading = all_metrics_df[('heading_degrees', 'heading_degrees')].values.reshape((-1,))
 
     onset = onset_offset[0]
@@ -676,8 +681,9 @@ def compute_single_bout_metrics(all_metrics_df:pd.DataFrame,
 
     # whole-body displacement related (point-based metrics)
     total_distance = np.nansum(dt_values[onset:offset])
-    average_speed = total_distance / (duration/1000)
+    mean_speed = total_distance / (duration/1000)
     max_point_speed = np.nanmax(velocity[onset:offset])
+    mean_accel = np.nanmean(acceleration[onset:offset])
     max_point_accel = np.nanmax(acceleration[onset:offset])
 
     # tail related (vector-based)
@@ -715,7 +721,10 @@ def compute_single_bout_metrics(all_metrics_df:pd.DataFrame,
     bout_end_angle = np.abs(heading[onset]  \
                             - heading[offset])
     bout_end_angle2 = 360 - bout_end_angle 
-    bout_end_angle = np.min([bout_end_angle, bout_end_angle2], axis=0)
+    bout_end_angle = np.min(np.abs([bout_end_angle, bout_end_angle2]), axis=0)
+
+    max_yaw_speed = np.nanmax(yaw_speed)
+    mean_yaw_speed = np.nanmean(yaw_speed)
 
     bout_dict = {'onset': onset_offset[0],
                  'offset': onset_offset[1],
@@ -724,20 +733,23 @@ def compute_single_bout_metrics(all_metrics_df:pd.DataFrame,
     
     bout_dict.update({'duration': duration,                         # in miliseconts
                       'total_distance': total_distance,             # in milimeters
-                      'avg_speed': average_speed,                   # in mm.s^-1
+                      'mean_speed': mean_speed,                   # in mm.s^-1
                       'max_speed': max_point_speed,                 # in mm.s^-1
+                      'mean_acceleration': mean_accel,            # in mm.s^-2
                       'max_acceleration': max_point_accel,          # in mm.s^-2
-                      'avg_mtc': mean_mtc,                          # in degrees
+                      'mean_mtc': mean_mtc,                          # in degrees
                       'max_abs_mtc': max_abs_point_mtc,             # in degrees
                       'bout_symmetry': bout_symmetry,               # dimensionless 
                       'max_mtc_velocity': max_mtc_velocity,         # in degrees.s^-1
-                      'avg_mtc_velocity': mean_mtc_velocity,        # in degrees.s^-1
+                      'neab_mtc_velocity': mean_mtc_velocity,        # in degrees.s^-1
                       'tailbeat_frequency': dominant_tailbeat_freq, # in Hz, dominant tailbeat freq
                       'total_vigor': total_vigor,                   # in degrees.s^-1
                       'max_vigor': max_point_vigor,                 # in degrees.s^-1
-                      'avg_vigor': mean_vigor,                      # in degrees.s^-1
+                      'mean_vigor': mean_vigor,                      # in degrees.s^-1
+                      'mean_yaw_speed': mean_yaw_speed,             # in degrees.s^-1
+                      'max_yaw_speed': max_yaw_speed,               # in degrees.s^-1
                       'max_turn_angle': max_turn_angle,             # in degrees
-                      'bout_end_angle': bout_end_angle 
+                      'bout_end_angle': bout_end_angle              # in degrees
                       })
     # add a variable for each tail segment max amplitude, in degrees (from absolute values)
     bout_dict.update({'max_tail_amplitude_'+str(i+1) : tail_max_amplitude[i] \
